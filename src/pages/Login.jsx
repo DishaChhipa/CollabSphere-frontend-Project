@@ -1,176 +1,102 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import authService from '../services/authService';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import authService from "../services/authService";
 
 const Login = () => {
-    const navigate = useNavigate();
-    const [formData, setFormData] = useState({
-        email: '',
-        password: '',
-    });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-    // Check if user is already logged in
-    useEffect(() => {
-        if (authService.isAuthenticated()) {
-            navigate('/home');
-        }
-    }, [navigate]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-    const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
-        // Clear error when user starts typing
-        if (error) setError('');
-    };
+    try {
+      await authService.login({ email, password });
+      navigate("/home");
+    } catch (err) {
+      setError("Invalid email or password");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const validateForm = () => {
-        if (!formData.email || !formData.password) {
-            setError('Please fill in all fields');
-            return false;
-        }
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-100 px-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+        {/* Title */}
+        <h2 className="text-3xl font-extrabold text-center text-gray-800 mb-2">
+          Welcome!
+        </h2>
+        <p className="text-center text-gray-500 mb-8">
+          Login to continue to CollabSphere
+        </p>
 
-        // Basic email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(formData.email)) {
-            setError('Please enter a valid email address');
-            return false;
-        }
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
+            {error}
+          </div>
+        )}
 
-        if (formData.password.length < 6) {
-            setError('Password must be at least 6 characters');
-            return false;
-        }
+        {/* Login Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Email */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
 
-        return true;
-    };
+          {/* Password */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-500 text-white font-semibold shadow-md hover:scale-105 transition-transform disabled:opacity-60"
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
+        </form>
 
-        if (!validateForm()) {
-            return;
-        }
-
-        setLoading(true);
-
-        try {
-            const result = await authService.login(formData.email, formData.password);
-
-            if (result.success) {
-                // Login successful
-                console.log('Login successful:', result.data);
-                navigate('/home');
-            } else {
-                // Login failed
-                setError(result.error);
-            }
-        } catch (err) {
-            setError('An unexpected error occurred. Please try again.');
-            console.error('Login error:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="auth-page">
-            <div className="auth-container">
-                <div className="auth-card">
-                    {/* Logo */}
-                    <div className="auth-logo">
-                        <div className="logo-icon">C</div>
-                        <h1>CollabSphere</h1>
-                    </div>
-
-                    {/* Title */}
-                    <h2 className="auth-title">Welcome Back</h2>
-                    <p className="auth-subtitle">Login to continue to your account</p>
-
-                    {/* Error Message */}
-                    {error && (
-                        <div className="error-message">
-                            <span className="error-icon">⚠️</span>
-                            {error}
-                        </div>
-                    )}
-
-                    {/* Login Form */}
-                    <form onSubmit={handleSubmit} className="auth-form">
-                        <div className="form-group">
-                            <label htmlFor="email">Email Address</label>
-                            <input
-                                type="email"
-                                id="email"
-                                name="email"
-                                placeholder="your@email.com"
-                                value={formData.email}
-                                onChange={handleChange}
-                                disabled={loading}
-                                autoComplete="email"
-                                required
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="password">Password</label>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                placeholder="••••••••"
-                                value={formData.password}
-                                onChange={handleChange}
-                                disabled={loading}
-                                autoComplete="current-password"
-                                required
-                            />
-                        </div>
-
-                        <button 
-                            type="submit" 
-                            className="submit-btn" 
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <>
-                                    <span className="spinner"></span>
-                                    Logging in...
-                                </>
-                            ) : (
-                                'Login'
-                            )}
-                        </button>
-                    </form>
-
-                    {/* Register Link */}
-                    <p className="auth-link">
-                        Don't have an account?{' '}
-                        <span 
-                            className="link-text" 
-                            onClick={() => navigate('/register')}
-                        >
-                            Register here
-                        </span>
-                    </p>
-
-                    {/* Back to Home */}
-                    <p className="auth-link">
-                        <span 
-                            className="link-text" 
-                            onClick={() => navigate('/')}
-                        >
-                            ← Back to Home
-                        </span>
-                    </p>
-                </div>
-            </div>
+        {/* Footer */}
+        <div className="text-center mt-6 text-sm text-gray-500">
+          Don’t have an account?{" "}
+          <spanspan
+            onClick={() => navigate("/register")}
+            className="text-purple-600 font-medium cursor-pointer hover:underline"
+          >
+            Register
+          </spanspan>
         </div>
-    );
+      </div>
+    </div>
+  );
 };
 
 export default Login;
