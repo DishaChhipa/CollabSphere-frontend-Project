@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useTeams } from '../store/TeamContext';
-import TeamCard from '../components/team/TeamCard';
-import CreateTeamModal from '../components/team/CreateTeamModal';
+import TeamCard from '../components/Team/TeamCard';
+import CreateTeamModal from '../components/Team/CreateTeamModal';
 import Button from '../components/common/Button';
 import Loader from '../components/common/Loader';
 import { Plus, Users, LayoutGrid, Zap } from 'lucide-react';

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
 import { useTeams } from '../store/TeamContext';
 import { useAuth } from '../hooks/useAuth';
-import ChatBox from '../components/chat/ChatBox';
+import ChatBox from '../components/Chat/ChatBox';
 import Loader from '../components/common/Loader';
 import { Users, Info, Hash, Settings, ChevronDown } from 'lucide-react';
 
@@ -12,7 +12,6 @@ const ChatPage = () => {
   const { messages, loading: chatLoading, loadMessages, sendMessage, subscribeToTeam, unsubscribeFromTeam } = useChat();
   const { teams, selectTeam, activeTeam, members, membersLoading, loading: teamsLoading, addMember } = useTeams();
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [pageLoading, setPageLoading] = useState(true);
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
@@ -28,7 +27,6 @@ const ChatPage = () => {
       if (teamsLoading || (teamId === loadedTeamId.current && activeTeam?.id.toString() === teamId)) return;
 
       if (teamId && teams.length > 0) {
-        setLoading(true);
         setPageLoading(true);
         const team = teams.find(t => t.id.toString() === teamId);
         if (team) {
@@ -40,15 +38,12 @@ const ChatPage = () => {
           } catch (error) {
             console.error("Failed to load chat:", error);
           } finally {
-            setLoading(false);
             setPageLoading(false);
           }
         } else {
-          setLoading(false);
           setPageLoading(false);
         }
       } else if (!teamsLoading && teams.length === 0) {
-        setLoading(false);
         setPageLoading(false);
       }
     };
@@ -92,9 +87,6 @@ const ChatPage = () => {
     setAddLoading(false);
   };
 
-
-  // Show loader while initial data is being fetched
-  if (loading) return <div className="h-full flex items-center justify-center">Loading chat...</div>;
 
   if (teamsLoading || pageLoading || (chatLoading && messages.length === 0)) {
     return <Loader fullPage />;

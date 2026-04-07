@@ -14,7 +14,6 @@ const FilesPage = () => {
   const { files, loading: filesLoading, fetchTeamFiles, uploadFile, deleteFile } = useFile();
   const { teams, activeTeam, members, membersLoading, selectTeam, loading: teamsLoading } = useTeams();
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [pageLoading, setPageLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
@@ -27,7 +26,6 @@ const FilesPage = () => {
       if (teamsLoading || (teamId === loadedTeamId.current && activeTeam?.id.toString() === teamId)) return;
 
       if (teamId && teams.length > 0) {
-        setLoading(true);
         setPageLoading(true);
         const team = teams.find(t => t.id.toString() === teamId);
         if (team) {
@@ -38,15 +36,12 @@ const FilesPage = () => {
           } catch (error) {
             console.error("Failed to load files:", error);
           } finally {
-            setLoading(false);
             setPageLoading(false);
           }
         } else {
-          setLoading(false);
           setPageLoading(false);
         }
       } else if (!teamsLoading && teams.length === 0) {
-        setLoading(false);
         setPageLoading(false);
       }
     };
@@ -83,8 +78,6 @@ const FilesPage = () => {
       alert(result.error);
     }
   };
-
-  if (loading) return <div className="h-full flex items-center justify-center">Loading files...</div>;
 
   if (teamsLoading || pageLoading || (filesLoading && files.length === 0)) {
     return <Loader fullPage />;
