@@ -3,92 +3,175 @@ import messageService from '../services/messageService';
 import socketService from '../socket/socket';
 import { useAuth } from './AuthContext';
 
+// Request notification permission on mount
+if (typeof window !== 'undefined' && 'Notification' in window) {
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
 const ChatContext = createContext();
 
 export const ChatProvider = ({ children }) => {
-  const [messages, setMessages] = useState([]);
+  const [teamMessages, setTeamMessages] = useState([]);
+  const [privateMessages, setPrivateMessages] = useState({}); // { receiverId: [messages] }
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
-  const currentSubscription = useRef(null);
+  const currentTeamSub = useRef(null);
+  const privateSub = useRef(null);
 
   const loadMessages = useCallback(async (teamId) => {
     if (!teamId) return;
     setLoading(true);
     const result = await messageService.getMessagesForTeam(teamId);
     if (result.success) {
-      // Set initial data from REST API
-      setMessages(result.data.content || []);
+      setTeamMessages(result.data.content || []);
     }
     setLoading(false);
   }, []);
 
-  const handleNewMessage = useCallback((message) => {
+  const loadPrivateMessages = useCallback(async (otherUserId) => {
+    if (!otherUserId) return;
+    setLoading(true);
+    // Assuming messageService.getPrivateMessages exists or will be added
+    const result = await messageService.getPrivateMessages(otherUserId);
+    if (result.success) {
+      setPrivateMessages(prev => ({
+        ...prev,
+        [otherUserId]: result.data.content || []
+      }));
+    }
+    setLoading(false);
+  }, []);
+
+  const showBrowserNotification = useCallback((title, body) => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body });
+    }
+  }, []);
+
+  const handleTeamMessage = useCallback((message) => {
     if (!message) return;
+    console.log("Team message received:", message);
     
-    setMessages((prev) => {
-      // Prevent duplicates if by any chance the same message is received twice
+    setTeamMessages((prev) => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) return prev;
-      console.log("Incoming message received and added to state:", message);
+      
+      // Notify if it's not from me
+      if (message.senderEmail !== user?.email) {
+          showBrowserNotification("New Message", `${message.senderName || 'Anonymous'}: ${message.content || 'Sent a file'}`);
+      }
+      
       return [...prev, message];
     });
-  }, []);
+  }, [user?.email, showBrowserNotification]);
+
+  const handlePrivateMessage = useCallback((message) => {
+    if (!message) return;
+    console.log("Private message received:", message);
+    
+    const otherId = message.senderId === user?.id ? message.receiverId : message.senderId;
+    if (!otherId) return;
+
+    setPrivateMessages((prev) => {
+      const chat = prev[otherId] || [];
+      const exists = chat.some(m => m.id === message.id);
+      if (exists) return prev;
+      
+      // Notify if it's not from me
+      if (message.senderEmail !== user?.email) {
+          showBrowserNotification("New Private Message", `${message.senderName || 'Anonymous'}: ${message.content || 'Sent a file'}`);
+      }
+
+      return {
+        ...prev,
+        [otherId]: [...chat, message]
+      };
+    });
+  }, [user?.id, user?.email, showBrowserNotification]);
 
   const subscribeToTeam = useCallback((teamId) => {
     if (!teamId) return;
-
-    // 1. Cleanup previous subscription if any
-    if (currentSubscription.current) {
-        socketService.unsubscribe(currentSubscription.current);
+    if (currentTeamSub.current) {
+        socketService.unsubscribe(currentTeamSub.current);
     }
-
-    // 2. Define target destination
     const destination = `/topic/team/${teamId}`;
-    console.log("Subscribing to team:", teamId);
-    currentSubscription.current = destination;
+    currentTeamSub.current = destination;
+    socketService.subscribe(destination, handleTeamMessage);
+  }, [handleTeamMessage]);
 
-    // 3. Subscribe via updated socketService
-    socketService.subscribe(destination, handleNewMessage);
-  }, [handleNewMessage]);
+  const subscribeToPrivate = useCallback(() => {
+    if (!user?.email || privateSub.current) return;
+    privateSub.current = 'receivePrivateMessage'; // Logic flag
+    socketService.on('receivePrivateMessage', handlePrivateMessage);
+  }, [user?.email, handlePrivateMessage]);
 
-  const unsubscribeFromTeam = useCallback((teamId) => {
-     if (currentSubscription.current) {
-        socketService.unsubscribe(currentSubscription.current);
-        currentSubscription.current = null;
+  const unsubscribeFromTeam = useCallback(() => {
+     if (currentTeamSub.current) {
+        socketService.unsubscribe(currentTeamSub.current);
+        currentTeamSub.current = null;
      }
   }, []);
 
   const sendMessage = useCallback((teamId, content, attachmentUrl = null, type = 'TEXT') => {
     if (!teamId || (!content?.trim() && !attachmentUrl)) return;
-
-    if (!socketService.isConnected()) {
-      console.log('STOMP Connected: false. Cannot send message.');
-      return;
-    }
+    if (!socketService.isConnected()) return;
 
     const messageData = {
       teamId: String(teamId),
       content: content?.trim(),
       attachmentUrl: attachmentUrl,
+      senderId: user?.id,
       senderEmail: user?.email,
-      timestamp: new Date().toISOString(),
+      senderName: user?.name,
       type: type
     };
-    
-    console.log("Sending payload to /app/chat/" + teamId + ":", messageData);
-    
-    // Send via WebSocket ONLY (body is stringified in socketService)
-    socketService.send(`/app/chat/${teamId}`, messageData);
+    console.log("Sending message:", messageData);
+    socketService.emit('sendMessage', messageData);
   }, [user]);
 
+  const sendPrivateMessage = useCallback((receiverId, content, attachmentUrl = null, type = 'TEXT', receiverEmail = null) => {
+    if (!receiverId || (!content?.trim() && !attachmentUrl)) return;
+    if (!socketService.isConnected()) return;
+
+    const messageData = {
+      receiverId: receiverId,
+      receiverEmail: receiverEmail,
+      content: content?.trim(),
+      attachmentUrl: attachmentUrl,
+      senderId: user?.id,
+      senderEmail: user?.email,
+      senderName: user?.name,
+      type: type
+    };
+    console.log("Sending private message:", messageData);
+    socketService.emit('privateMessage', messageData);
+  }, [user]);
+
+  useEffect(() => {
+    if (user?.email) {
+      subscribeToPrivate();
+    }
+    return () => {
+      if (privateSub.current) {
+        socketService.unsubscribe(privateSub.current);
+        privateSub.current = null;
+      }
+    };
+  }, [user?.email, subscribeToPrivate]);
+
   const chatValue = useMemo(() => ({
-    messages, 
-    loading, 
-    loadMessages, 
-    sendMessage, 
-    subscribeToTeam, 
-    unsubscribeFromTeam 
-  }), [messages, loading, loadMessages, sendMessage, subscribeToTeam, unsubscribeFromTeam]);
+    teamMessages,
+    privateMessages,
+    loading,
+    loadMessages,
+    loadPrivateMessages,
+    sendMessage,
+    sendPrivateMessage,
+    subscribeToTeam,
+    unsubscribeFromTeam
+  }), [teamMessages, privateMessages, loading, loadMessages, loadPrivateMessages, sendMessage, sendPrivateMessage, subscribeToTeam, unsubscribeFromTeam]);
 
   return (
     <ChatContext.Provider value={chatValue}>

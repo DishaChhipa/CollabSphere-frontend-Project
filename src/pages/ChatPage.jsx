@@ -9,7 +9,17 @@ import { Users, Info, Hash, Settings, ChevronDown } from 'lucide-react';
 
 const ChatPage = () => {
   const { teamId } = useParams();
-  const { messages, loading: chatLoading, loadMessages, sendMessage, subscribeToTeam, unsubscribeFromTeam } = useChat();
+  const { 
+    teamMessages, 
+    privateMessages, 
+    loading: chatLoading, 
+    loadMessages, 
+    loadPrivateMessages, 
+    sendMessage, 
+    sendPrivateMessage, 
+    subscribeToTeam, 
+    unsubscribeFromTeam 
+  } = useChat();
   const { teams, selectTeam, activeTeam, members, membersLoading, loading: teamsLoading, addMember } = useTeams();
   const { user } = useAuth();
   const [pageLoading, setPageLoading] = useState(true);
@@ -17,6 +27,7 @@ const ChatPage = () => {
   const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [addLoading, setAddLoading] = useState(false);
+  const [selectedRecipient, setSelectedRecipient] = useState(null); // null means team chat, or { id, name, email }
 
   const loadedTeamId = useRef(null);
   const dropdownRef = useRef(null);
@@ -50,10 +61,13 @@ const ChatPage = () => {
 
     setupChat();
 
-    return () => {
-      // Logic for cleanup if needed
-    };
   }, [teamId, teamsLoading, loadMessages, subscribeToTeam, selectTeam]);
+ 
+  useEffect(() => {
+    if (selectedRecipient) {
+      loadPrivateMessages(selectedRecipient.id);
+    }
+  }, [selectedRecipient, loadPrivateMessages]);
 
   // Handle unmount specifically for socket unsubscribe
   useEffect(() => {
@@ -88,7 +102,7 @@ const ChatPage = () => {
   };
 
 
-  if (teamsLoading || pageLoading || (chatLoading && messages.length === 0)) {
+  if (teamsLoading || pageLoading || (chatLoading && (selectedRecipient ? !privateMessages[selectedRecipient.id] : teamMessages.length === 0))) {
     return <Loader fullPage />;
   }
 
@@ -112,8 +126,20 @@ const ChatPage = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">{activeTeam?.name}</h2>
-              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded uppercase">General</span>
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                {selectedRecipient ? `Chat with ${selectedRecipient.name}` : activeTeam?.name}
+              </h2>
+              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded uppercase">
+                {selectedRecipient ? 'Private' : 'General'}
+              </span>
+              {selectedRecipient && (
+                <button 
+                  onClick={() => setSelectedRecipient(null)}
+                  className="text-[10px] text-indigo-500 font-bold hover:underline ml-2"
+                >
+                  Return to Team Chat
+                </button>
+              )}
             </div>
             <div className="relative" ref={dropdownRef}>
                 <button 
@@ -144,10 +170,16 @@ const ChatPage = () => {
                                 members.map((member) => (
                                     <div 
                                         key={member.id} 
-                                        className="group flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-indigo-50/50 transition-all cursor-default"
+                                        onClick={() => {
+                                            if (member.email !== user?.email) {
+                                                setSelectedRecipient(member);
+                                                setIsMembersOpen(false);
+                                            }
+                                        }}
+                                        className={`group flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${member.email === user?.email ? 'cursor-default opacity-60' : 'cursor-pointer hover:bg-indigo-50/50'}`}
                                     >
                                         <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-600 border border-indigo-200">
-                                            {member.name[0].toUpperCase()}
+                                            {member.name?.[0]?.toUpperCase() || '?'}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-xs font-bold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
@@ -210,10 +242,17 @@ const ChatPage = () => {
       {/* Chat Area */}
       <div className="flex-1 min-h-0">
         <ChatBox 
-          messages={messages} 
-          onSendMessage={(content, attachmentUrl, type) => sendMessage(teamId, content, attachmentUrl, type)} 
+          messages={selectedRecipient ? (privateMessages[selectedRecipient.id] || []) : teamMessages} 
+          onSendMessage={(content, attachmentUrl, type) => {
+            if (selectedRecipient) {
+              sendPrivateMessage(selectedRecipient.id, content, attachmentUrl, type, selectedRecipient.email);
+            } else {
+              sendMessage(teamId, content, attachmentUrl, type);
+            }
+          }} 
           loading={chatLoading}
           teamId={teamId}
+          recipient={selectedRecipient}
         />
       </div>
     </div>

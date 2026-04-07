@@ -131,6 +131,42 @@ class SocketService {
       body: JSON.stringify(body),
     });
   }
+
+  // --- Socket.io-like Aliases ---
+  
+  emit(event, data) {
+    if (event === 'privateMessage') {
+      this.send('/app/private-chat', data);
+    } else if (event === 'sendMessage') {
+      // Assuming generic team send if teamId is present in data
+      const teamId = data.teamId;
+      if (teamId) {
+        this.send(`/app/chat/${teamId}`, data);
+      } else {
+        console.error('emit("sendMessage") requires teamId in data');
+      }
+    } else {
+      console.warn(`Untracked emit event: ${event}`);
+    }
+  }
+
+  on(event, callback) {
+    if (event === 'receivePrivateMessage') {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (user && user.email) {
+        this.subscribe('/user/queue/messages', callback);
+      } else {
+        console.error('Cannot subscribe to private messages: User email not found in localStorage');
+      }
+    } else if (event === 'receiveMessage') {
+        // This is tricky as teamId varies. 
+        // We'll let ChatContext handle team subscriptions via subscribe() for now,
+        // or support a special naming convention if needed.
+        console.warn('on("receiveMessage") is better handled via subscribe(destination) for dynamic team IDs');
+    } else {
+      console.warn(`Untracked on event: ${event}`);
+    }
+  }
 }
 
 const socketService = new SocketService();
