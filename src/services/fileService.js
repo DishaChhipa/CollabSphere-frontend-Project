@@ -64,7 +64,24 @@ const fileService = {
         error: error.response?.data?.message || 'Failed to delete file',
       };
     }
-  }
+  },
+  /**
+   * List files for a team
+   * @param {number|string} teamId - The team ID
+   * @returns {Promise<{success: boolean, data?: any[], error?: string}>}
+   */
+  listFilesForTeam: async (teamId) => {
+    try {
+      const response = await axiosInstance.get(`/files/team/${teamId}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Failed to list team files:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to list team files',
+      };
+    }
+  },
 };
 
 export default fileService;

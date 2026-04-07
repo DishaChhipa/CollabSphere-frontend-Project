@@ -14,6 +14,7 @@ export const FileProvider = ({ children }) => {
       setFiles(result.data);
     }
     setLoading(false);
+    return result;
   }, []);
 
   const uploadFile = useCallback(async (file, teamId) => {

@@ -20,6 +20,8 @@ const FilesPage = () => {
   const loadedTeamId = useRef(null);
   const dropdownRef = useRef(null);
 
+  console.log("FilesPage loaded - teamId:", teamId);
+
   useEffect(() => {
     const setupFiles = async () => {
       // Don't do anything if teams are still loading or if this team is already loaded
@@ -27,11 +29,13 @@ const FilesPage = () => {
 
       if (teamId && teams.length > 0) {
         setPageLoading(true);
-        const team = teams.find(t => t.id.toString() === teamId);
+        const team = teams.find(t => String(t.id) === String(teamId));
         if (team) {
           try {
+            console.log("Loading files for team:", team.name);
             selectTeam(team);
-            await fetchTeamFiles(teamId);
+            const data = await fetchTeamFiles(teamId);
+            console.log("API response (fetchTeamFiles):", data);
             loadedTeamId.current = teamId;
           } catch (error) {
             console.error("Failed to load files:", error);
@@ -39,6 +43,7 @@ const FilesPage = () => {
             setPageLoading(false);
           }
         } else {
+          console.warn("Team not found in teams list:", teamId);
           setPageLoading(false);
         }
       } else if (!teamsLoading && teams.length === 0) {
@@ -65,8 +70,16 @@ const FilesPage = () => {
     if (!file) return;
 
     setIsUploading(true);
+    console.log("Starting file upload for teamId:", teamId);
+    
     const result = await uploadFile(file, teamId);
-    if (!result.success) alert(result.error);
+    console.log("Upload API response:", result);
+
+    if (!result.success) {
+        alert(result.error || "File upload failed");
+    } else {
+        console.log("File uploaded successfully");
+    }
     setIsUploading(false);
   };
 
@@ -138,7 +151,7 @@ const FilesPage = () => {
                                         className="group flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 transition-all cursor-default"
                                     >
                                         <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-xs font-bold text-indigo-600">
-                                            {member.name[0].toUpperCase()}
+                                            {member.name?.[0]?.toUpperCase() || '?'}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-xs font-bold text-slate-700 truncate group-hover:text-indigo-600 transition-colors">

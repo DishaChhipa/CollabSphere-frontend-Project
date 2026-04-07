@@ -3,9 +3,24 @@ import axiosInstance from '../api/axios';
 const teamService = {
   createTeam: async (name, description) => {
     try {
-      const response = await axiosInstance.post('/teams', { name, description });
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error("CREATE TEAM: No token found in localStorage");
+      }
+
+      const payload = { 
+        name: name?.trim(), 
+        description: description?.trim() || "" 
+      };
+
+      console.log("CREATE TEAM: Sending payload:", payload);
+
+      const response = await axiosInstance.post('/teams', payload);
+      console.log("CREATE TEAM: Success response:", response.data);
+
       return { success: true, data: response.data };
     } catch (error) {
+      console.error("CREATE TEAM: Full error response:", error.response || error);
       return { success: false, error: error.response?.data?.message || 'Failed to create team' };
     }
   },
